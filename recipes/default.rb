@@ -55,16 +55,41 @@ link '/usr/bin/sonarqube' do
   to sonarqube_runscript
 end
 
-template '/etc/init.d/sonarqube' do
-  source 'sonarqube.erb'
-  mode 0755
-  owner 'root'
-  group 'root'
-  variables(
-    user: sonarqube_user
-  )
-end
 
+# Check if running on on Centos/Redhat
+if platform?('rhel', 'centos')
+  systemd_unit 'sonarqube.service' do
+    content(
+      Unit:    {
+        Description: 'Sonarqube server',
+        After:       'network.target',
+      },
+      Service: {
+        Type:           'simple',
+        ExecStart:      "/usr/bin/sonarqube start",
+        ExecStop:      "/usr/bin/sonarqube stop",
+        Restart:        'always',
+        RestartSec:     '30s',
+        TimeoutStopSec: '300s',
+        User:           node['sonarqube']['user'],
+      },
+      Install: {
+        WantedBy: 'multi-user.target',
+      },
+    )
+    action %i[create enable]
+  end
+else
+  template '/etc/init.d/sonarqube' do
+    source 'sonarqube.erb'
+    mode 0755
+    owner 'root'
+    group 'root'
+    variables(
+      user: sonarqube_user
+    )
+  end
+end
 service 'sonarqube' do
   supports restart: true, reload: false, status: true
   action [:enable, :start]
